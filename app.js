@@ -3,6 +3,8 @@ const SEARCH_URL = "https://archive.org/advancedsearch.php";
 const METADATA_URL = "https://archive.org/metadata";
 const ROWS = 50;
 const MAX_ATTEMPTS = 8;
+const RECENT_HISTORY_KEY = "vhsVaultRecentIdentifiers";
+const RECENT_HISTORY_LIMIT = 50;
 const FALLBACK_IDENTIFIERS = [
   "rare-servicio-de-radiodifusion-publica-logo-1971-1985",
   "conneticut-broadcasting",
@@ -146,8 +148,39 @@ async function getTotalItems() {
   return totalItems;
 }
 
+function recentIdentifiers() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+  } catch (error) {
+    console.warn(error);
+    return [];
+  }
+}
+
+function isRecentlyPlayed(identifier) {
+  return recentIdentifiers().includes(identifier);
+}
+
+function rememberIdentifier(identifier) {
+  if (!identifier) return;
+
+  const next = [
+    identifier,
+    ...recentIdentifiers().filter((item) => item !== identifier),
+  ].slice(0, RECENT_HISTORY_LIMIT);
+
+  localStorage.setItem(RECENT_HISTORY_KEY, JSON.stringify(next));
+}
+
+function pickIdentifier(identifiers) {
+  const unseen = identifiers.filter((identifier) => !isRecentlyPlayed(identifier));
+  const pool = unseen.length ? unseen : identifiers;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function randomFallbackIdentifier() {
-  return FALLBACK_IDENTIFIERS[Math.floor(Math.random() * FALLBACK_IDENTIFIERS.length)];
+  return pickIdentifier(FALLBACK_IDENTIFIERS);
 }
 
 async function randomIdentifier() {
@@ -165,9 +198,11 @@ async function randomIdentifier() {
     });
 
     const data = await fetchJson(SEARCH_URL + "?" + params, "Archive search");
-    const docs = data.response?.docs || [];
-    if (!docs.length) throw new Error("Archive.org returned an empty random page.");
-    return docs[Math.floor(Math.random() * docs.length)].identifier;
+    const identifiers = (data.response?.docs || [])
+      .map((doc) => doc.identifier)
+      .filter(Boolean);
+    if (!identifiers.length) throw new Error("Archive.org returned an empty random page.");
+    return pickIdentifier(identifiers);
   } catch (error) {
     console.warn(error);
     return randomFallbackIdentifier();
@@ -218,6 +253,7 @@ async function loadRandomVideo() {
     els.runtime.textContent = secondsToRuntime(file.length || metadata.runtime);
     els.sourceFile.textContent = file.name || "-";
     els.archiveLink.href = identifier ? `https://archive.org/details/${encodeURIComponent(identifier)}` : "https://archive.org/details/vhsvault";
+    rememberIdentifier(identifier);
 
     clearLoading();
     await els.video.play().catch(() => {
