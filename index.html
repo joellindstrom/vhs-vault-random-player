@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VHS Vault Random Player</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="player-shell" aria-label="Random VHS Vault video player">
+        <div class="masthead">
+          <div>
+            <p class="eyebrow">Archive.org VHS Vault</p>
+            <h1>Random VHS Player</h1>
+          </div>
+          <button id="randomButton" class="primary" type="button">
+            Another random tape
+          </button>
+        </div>
+
+        <div class="screen-wrap">
+          <div id="loading" class="loading" role="status">Finding a tape...</div>
+          <video id="video" class="screen" controls playsinline preload="metadata"></video>
+        </div>
+
+        <div class="meta">
+          <div class="poster-frame">
+            <img id="poster" alt="">
+          </div>
+          <div class="details">
+            <div class="title-row">
+              <h2 id="title">Loading VHS Vault...</h2>
+              <a id="archiveLink" href="https://archive.org/details/vhsvault" target="_blank" rel="noreferrer">Open item</a>
+            </div>
+            <p id="description">Picking a random playable video from the collection.</p>
+            <dl>
+              <div>
+                <dt>Identifier</dt>
+                <dd id="identifier">-</dd>
+              </div>
+              <div>
+                <dt>Runtime</dt>
+                <dd id="runtime">-</dd>
+              </div>
+              <div>
+                <dt>Source file</dt>
+                <dd id="sourceFile">-</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
