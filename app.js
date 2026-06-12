@@ -1,27 +1,15 @@
 const COLLECTION = "vhsvault";
 const SEARCH_URL = "https://archive.org/advancedsearch.php";
 const METADATA_URL = "https://archive.org/metadata";
-const ROWS = 50;
+const ROWS = 250;
+const FALLBACK_CATALOG_URL = "./fallback-identifiers.json";
 const MAX_ATTEMPTS = 8;
 const RECENT_HISTORY_KEY = "vhsVaultRecentIdentifiers";
-const RECENT_HISTORY_LIMIT = 50;
+const RECENT_HISTORY_LIMIT = 100;
+const FALLBACK_DECK_KEY = "vhsVaultFallbackDeck";
 const FALLBACK_IDENTIFIERS = [
   "rare-servicio-de-radiodifusion-publica-logo-1971-1985",
-  "conneticut-broadcasting",
-  "BillCollinsGodsCountryAndTheWomanTEN10_8-12-90",
-  "VHSFoxMMPRWOC",
-  "BP_1987",
-  "coca-cola-cal-king-commercial-2002",
-  "Film_Almost_Famous_Movie_Trailer",
-  "armenian-holiday-desserts-1996-vhs",
-  "abc-promo-breaks-news-19991128",
-  "mca-tv-logo-1991-1993",
-  "national-security-2003-trailer",
-  "capture-a-5180",
-  "capture-a-5518",
-  "capture-a-5556",
-  "capture-a-6054",
-  "capture-a-6244"
+  "national-security-2003-trailer"
 ];
 
 const els = {
@@ -38,6 +26,7 @@ const els = {
 };
 
 let totalItems = null;
+let fallbackCatalogPromise = null;
 
 function archiveFileUrl(identifier, fileName) {
   return `https://archive.org/download/${encodeURIComponent(identifier)}/${fileName
@@ -173,14 +162,67 @@ function rememberIdentifier(identifier) {
   localStorage.setItem(RECENT_HISTORY_KEY, JSON.stringify(next));
 }
 
+function shuffle(items) {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 function pickIdentifier(identifiers) {
-  const unseen = identifiers.filter((identifier) => !isRecentlyPlayed(identifier));
-  const pool = unseen.length ? unseen : identifiers;
+  const unique = [...new Set(identifiers)].filter(Boolean);
+  const unseen = unique.filter((identifier) => !isRecentlyPlayed(identifier));
+  const pool = unseen.length ? unseen : unique;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function randomFallbackIdentifier() {
-  return pickIdentifier(FALLBACK_IDENTIFIERS);
+function readDeck(key) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+  } catch (error) {
+    console.warn(error);
+    return [];
+  }
+}
+
+function writeDeck(key, deck) {
+  localStorage.setItem(key, JSON.stringify(deck));
+}
+
+function drawFromDeck(key, sourceIdentifiers) {
+  const source = [...new Set(sourceIdentifiers)].filter(Boolean);
+  let deck = readDeck(key).filter((identifier) => source.includes(identifier) && !isRecentlyPlayed(identifier));
+
+  if (!deck.length) {
+    deck = shuffle(source.filter((identifier) => !isRecentlyPlayed(identifier)));
+  }
+
+  if (!deck.length) {
+    deck = shuffle(source);
+  }
+
+  const identifier = deck.shift();
+  writeDeck(key, deck);
+  return identifier;
+}
+
+async function fallbackCatalog() {
+  if (!fallbackCatalogPromise) {
+    fallbackCatalogPromise = fetchJson(FALLBACK_CATALOG_URL, "Local fallback catalog")
+      .then((identifiers) => Array.isArray(identifiers) ? identifiers : FALLBACK_IDENTIFIERS)
+      .catch((error) => {
+        console.warn(error);
+        return FALLBACK_IDENTIFIERS;
+      });
+  }
+  return fallbackCatalogPromise;
+}
+
+async function randomFallbackIdentifier() {
+  return drawFromDeck(FALLBACK_DECK_KEY, await fallbackCatalog());
 }
 
 async function randomIdentifier() {
@@ -205,7 +247,7 @@ async function randomIdentifier() {
     return pickIdentifier(identifiers);
   } catch (error) {
     console.warn(error);
-    return randomFallbackIdentifier();
+    return await randomFallbackIdentifier();
   }
 }
 
