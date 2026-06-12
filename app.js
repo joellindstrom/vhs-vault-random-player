@@ -3,6 +3,24 @@ const SEARCH_URL = "https://archive.org/advancedsearch.php";
 const METADATA_URL = "https://archive.org/metadata";
 const ROWS = 50;
 const MAX_ATTEMPTS = 8;
+const FALLBACK_IDENTIFIERS = [
+  "rare-servicio-de-radiodifusion-publica-logo-1971-1985",
+  "conneticut-broadcasting",
+  "BillCollinsGodsCountryAndTheWomanTEN10_8-12-90",
+  "VHSFoxMMPRWOC",
+  "BP_1987",
+  "coca-cola-cal-king-commercial-2002",
+  "Film_Almost_Famous_Movie_Trailer",
+  "armenian-holiday-desserts-1996-vhs",
+  "abc-promo-breaks-news-19991128",
+  "mca-tv-logo-1991-1993",
+  "national-security-2003-trailer",
+  "capture-a-5180",
+  "capture-a-5518",
+  "capture-a-5556",
+  "capture-a-6054",
+  "capture-a-6244"
+];
 
 const els = {
   video: document.querySelector("#video"),
@@ -91,56 +109,88 @@ function clearLoading() {
   els.randomButton.disabled = false;
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  return response.json();
+async function fetchJson(url, label) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(url, {
+      mode: "cors",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) throw new Error(label + ": " + response.status + " " + response.statusText);
+    return response.json();
+  } catch (error) {
+    const reason = error.name === "AbortError" ? "request timed out" : error.message;
+    throw new Error(label + ": " + reason);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 async function getTotalItems() {
   if (totalItems !== null) return totalItems;
 
   const params = new URLSearchParams({
-    q: `collection:${COLLECTION} AND mediatype:movies`,
+    q: "collection:" + COLLECTION + " AND mediatype:movies",
     "fl[]": "identifier",
     rows: "0",
     page: "1",
     output: "json",
   });
-  const data = await fetchJson(`${SEARCH_URL}?${params}`);
+  const data = await fetchJson(SEARCH_URL + "?" + params, "Archive search count");
   totalItems = data.response?.numFound || 0;
   if (!totalItems) throw new Error("The VHS Vault search did not return any items.");
   return totalItems;
 }
 
+function randomFallbackIdentifier() {
+  return FALLBACK_IDENTIFIERS[Math.floor(Math.random() * FALLBACK_IDENTIFIERS.length)];
+}
+
 async function randomIdentifier() {
-  const total = await getTotalItems();
-  const start = Math.floor(Math.random() * total);
-  const page = Math.floor(start / ROWS) + 1;
+  try {
+    const total = await getTotalItems();
+    const start = Math.floor(Math.random() * total);
+    const page = Math.floor(start / ROWS) + 1;
 
-  const params = new URLSearchParams({
-    q: `collection:${COLLECTION} AND mediatype:movies`,
-    "fl[]": "identifier",
-    rows: String(ROWS),
-    page: String(page),
-    output: "json",
-  });
+    const params = new URLSearchParams({
+      q: "collection:" + COLLECTION + " AND mediatype:movies",
+      "fl[]": "identifier",
+      rows: String(ROWS),
+      page: String(page),
+      output: "json",
+    });
 
-  const data = await fetchJson(`${SEARCH_URL}?${params}`);
-  const docs = data.response?.docs || [];
-  if (!docs.length) throw new Error("Archive.org returned an empty random page.");
-  return docs[Math.floor(Math.random() * docs.length)].identifier;
+    const data = await fetchJson(SEARCH_URL + "?" + params, "Archive search");
+    const docs = data.response?.docs || [];
+    if (!docs.length) throw new Error("Archive.org returned an empty random page.");
+    return docs[Math.floor(Math.random() * docs.length)].identifier;
+  } catch (error) {
+    console.warn(error);
+    return randomFallbackIdentifier();
+  }
 }
 
 async function randomPlayableItem() {
+  let lastError = null;
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const identifier = await randomIdentifier();
-    const item = await fetchJson(`${METADATA_URL}/${encodeURIComponent(identifier)}`);
-    const file = playableFile(item.files || []);
-    if (file) return { item, file };
+    try {
+      const identifier = await randomIdentifier();
+      const item = await fetchJson(METADATA_URL + "/" + encodeURIComponent(identifier), "Archive metadata");
+      const file = playableFile(item.files || []);
+      if (file) return { item, file };
+      lastError = new Error("No playable video file found for " + identifier);
+    } catch (error) {
+      lastError = error;
+      console.warn(error);
+    }
   }
 
-  throw new Error("Could not find a browser-playable video after several random picks.");
+  throw lastError || new Error("Could not find a browser-playable video after several random picks.");
 }
 
 async function loadRandomVideo() {
