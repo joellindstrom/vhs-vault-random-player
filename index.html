@@ -3,56 +3,85 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>VHS Vault Random Player</title>
+    <title>VHS Vault Random Tape</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <main class="app">
-      <section class="player-shell" aria-label="Random VHS Vault video player">
-        <div class="masthead">
-          <div>
-            <p class="eyebrow">Archive.org VHS Vault</p>
-            <h1>Random VHS Player</h1>
+    <main class="stage">
+      <section class="screen-shell" aria-label="VHS Vault random tape player">
+        <video id="video" class="video" playsinline preload="metadata"></video>
+
+        <div id="bars" class="bars" aria-hidden="true">
+          <div class="bar-row top">
+            <i style="background:#bcbcbc"></i><i style="background:#bcbc1d"></i><i style="background:#1dbcbc"></i><i style="background:#1dbc1d"></i><i style="background:#bc1dbc"></i><i style="background:#bc1d1d"></i><i style="background:#1d1dbc"></i>
           </div>
-          <button id="randomButton" class="primary" type="button">
-            Another random tape
-          </button>
+          <div class="bar-row bottom">
+            <i style="background:#1d1dbc"></i><i style="background:#0b0b0b"></i><i style="background:#bc1dbc"></i><i style="background:#0b0b0b"></i><i style="background:#1dbcbc"></i><i style="background:#0b0b0b"></i><i style="background:#bcbcbc"></i>
+          </div>
         </div>
 
-        <div class="screen-wrap">
-          <div id="loading" class="loading" role="status">Finding a tape...</div>
-          <video id="video" class="screen" controls playsinline preload="metadata"></video>
+        <div id="loading" class="standby osd-text" role="status">
+          <div class="standby-main blink">PLEASE STAND BY</div>
+          <div class="standby-sub">TUNING - FINDING A TAPE</div>
         </div>
 
-        <div class="meta">
-          <div class="poster-frame">
-            <img id="poster" alt="">
+        <div id="errorPanel" class="standby error-panel osd-text" hidden>
+          <div class="standby-main">NO SIGNAL</div>
+          <div id="errorMessage" class="standby-sub">Could not load a random tape.</div>
+        </div>
+
+        <div id="playPrompt" class="play-prompt osd-text blink" hidden>PRESS PLAY</div>
+
+        <div id="osd" class="osd" hidden>
+          <div class="osd-top-left osd-text">
+            <div><span id="transportIcon" class="cyan">PLAY</span> <span id="transportState">PLAY</span></div>
+            <div class="osd-small"><span id="tapeMode">SP</span> - CH <span id="channel">03</span></div>
           </div>
-          <div class="details">
-            <div class="title-row">
-              <h2 id="title">Loading VHS Vault...</h2>
-              <a id="archiveLink" href="https://archive.org/details/vhsvault" target="_blank" rel="noreferrer">Open item</a>
+
+          <div class="osd-top-right osd-text">
+            <div>12<span class="blink">:</span>00 <span class="ampm">AM</span></div>
+            <button id="muteButton" class="mute-button osd-text" type="button">TAP FOR SOUND</button>
+          </div>
+
+          <div id="stamp" class="stamp osd-text">PM 08:21 JUN 13 1995</div>
+
+          <div class="title-band">
+            <div class="title-copy osd-text">
+              <h1 id="title">VHS Vault</h1>
+              <p id="description">Tuning...</p>
             </div>
-            <p id="description">Picking a random playable video from the collection.</p>
-            <dl>
-              <div>
-                <dt>Identifier</dt>
-                <dd id="identifier">-</dd>
-              </div>
-              <div>
-                <dt>Runtime</dt>
-                <dd id="runtime">-</dd>
-              </div>
-              <div>
-                <dt>Source file</dt>
-                <dd id="sourceFile">-</dd>
-              </div>
-            </dl>
+            <div class="time-copy osd-text">
+              <div id="timecode" class="timecode">0:00:00</div>
+              <div>TOTAL <span id="runtime">-</span></div>
+            </div>
           </div>
         </div>
+
+        <div class="tracking-line" aria-hidden="true"></div>
+        <div class="scanlines" aria-hidden="true"></div>
+        <div id="snow" class="snow" aria-hidden="true"></div>
+        <div class="glare" aria-hidden="true"></div>
+        <div id="flash" class="flash" aria-hidden="true"></div>
+      </section>
+
+      <section class="controls" aria-label="Tape controls">
+        <div class="control-row">
+          <button id="randomButton" class="primary osd-text" type="button">
+            <span>ANOTHER RANDOM TAPE</span>
+            <span class="select blink">SELECT</span>
+          </button>
+          <a id="archiveLink" class="ghost osd-text" href="https://archive.org/details/vhsvault" target="_blank" rel="noreferrer">OPEN ITEM</a>
+        </div>
+        <dl class="meta osd-text">
+          <div><dt>IDENTIFIER</dt><dd id="identifier">-</dd></div>
+          <div><dt>SOURCE</dt><dd id="sourceFile">-</dd></div>
+        </dl>
       </section>
     </main>
 
-    <script src="./app.js?v=cloudflare-worker-1"></script>
+    <script src="./app.js?v=vcr-osd-1"></script>
   </body>
 </html>

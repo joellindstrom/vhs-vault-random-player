@@ -12,10 +12,10 @@ const FALLBACK_IDENTIFIERS = [
   "rare-servicio-de-radiodifusion-publica-logo-1971-1985",
   "national-security-2003-trailer"
 ];
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 const els = {
   video: document.querySelector("#video"),
-  poster: document.querySelector("#poster"),
   title: document.querySelector("#title"),
   description: document.querySelector("#description"),
   identifier: document.querySelector("#identifier"),
@@ -24,16 +24,41 @@ const els = {
   archiveLink: document.querySelector("#archiveLink"),
   randomButton: document.querySelector("#randomButton"),
   loading: document.querySelector("#loading"),
+  bars: document.querySelector("#bars"),
+  osd: document.querySelector("#osd"),
+  errorPanel: document.querySelector("#errorPanel"),
+  errorMessage: document.querySelector("#errorMessage"),
+  playPrompt: document.querySelector("#playPrompt"),
+  snow: document.querySelector("#snow"),
+  flash: document.querySelector("#flash"),
+  transportIcon: document.querySelector("#transportIcon"),
+  transportState: document.querySelector("#transportState"),
+  tapeMode: document.querySelector("#tapeMode"),
+  channel: document.querySelector("#channel"),
+  stamp: document.querySelector("#stamp"),
+  timecode: document.querySelector("#timecode"),
+  muteButton: document.querySelector("#muteButton"),
 };
 
 let totalItems = null;
 let fallbackCatalogPromise = null;
+let currentTape = null;
+
+function pad(value) {
+  return String(value).padStart(2, "0");
+}
 
 function archiveFileUrl(identifier, fileName) {
-  return `https://archive.org/download/${encodeURIComponent(identifier)}/${fileName
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}`;
+  return "https://archive.org/download/" + encodeURIComponent(identifier) + "/" + fileName.split("/").map(encodeURIComponent).join("/");
+}
+
+function searchUrl(params) {
+  return (HAS_WORKER_API ? "/api/search" : SEARCH_URL) + "?" + params;
+}
+
+function metadataUrl(identifier) {
+  const encoded = encodeURIComponent(identifier);
+  return HAS_WORKER_API ? "/api/metadata/" + encoded : METADATA_URL + "/" + encoded;
 }
 
 function textFromValue(value) {
@@ -48,8 +73,8 @@ function cleanDescription(value) {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!raw) return "No description was provided for this item.";
-  return raw.length > 360 ? `${raw.slice(0, 357)}...` : raw;
+  if (!raw) return "VHS Vault - archive.org";
+  return raw.length > 120 ? raw.slice(0, 117) + "..." : raw;
 }
 
 function secondsToRuntime(seconds) {
@@ -60,20 +85,31 @@ function secondsToRuntime(seconds) {
   const minutes = Math.floor((parsed % 3600) / 60);
   const secs = Math.floor(parsed % 60);
 
-  if (hours) return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  return `${minutes}:${String(secs).padStart(2, "0")}`;
+  if (hours) return hours + ":" + pad(minutes) + ":" + pad(secs);
+  return minutes + ":" + pad(secs);
+}
+
+function randomStamp() {
+  const ampm = Math.random() < 0.5 ? "AM" : "PM";
+  const hour = pad(Math.floor(Math.random() * 12) + 1);
+  const minute = pad(Math.floor(Math.random() * 60));
+  const month = MONTHS[Math.floor(Math.random() * MONTHS.length)];
+  const day = pad(Math.floor(Math.random() * 28) + 1);
+  const year = "19" + pad(Math.floor(Math.random() * 9) + 90);
+  return ampm + " " + hour + ":" + minute + " " + month + " " + day + " " + year;
+}
+
+function flashScreen() {
+  els.flash.classList.remove("on");
+  void els.flash.offsetWidth;
+  els.flash.classList.add("on");
 }
 
 function playableFile(files) {
   const candidates = files.filter((file) => {
     const name = file.name || "";
-    const format = `${file.format || ""} ${file.source || ""}`.toLowerCase();
-    return (
-      /\.(mp4|m4v|webm|ogv)$/i.test(name) ||
-      format.includes("mpeg4") ||
-      format.includes("h.264") ||
-      format.includes("webm")
-    );
+    const format = String((file.format || "") + " " + (file.source || "")).toLowerCase();
+    return /\.(mp4|m4v|webm|ogv)$/i.test(name) || format.includes("mpeg4") || format.includes("h.264") || format.includes("webm");
   });
 
   return candidates.sort((a, b) => {
@@ -85,29 +121,35 @@ function playableFile(files) {
   })[0];
 }
 
-function posterFile(identifier, files) {
-  const file = files.find((item) => /(__ia_thumb|\.jpg|\.jpeg|\.png)$/i.test(item.name || ""));
-  return file ? archiveFileUrl(identifier, file.name) : "";
-}
-
 function setLoading(message) {
-  els.loading.textContent = message;
   els.loading.hidden = false;
+  els.errorPanel.hidden = true;
+  els.bars.hidden = false;
+  els.osd.hidden = true;
+  els.playPrompt.hidden = true;
+  els.snow.classList.add("heavy");
+  els.loading.querySelector(".standby-sub").textContent = message.toUpperCase();
   els.randomButton.disabled = true;
 }
 
-function clearLoading() {
+function setPlayingUi() {
   els.loading.hidden = true;
+  els.errorPanel.hidden = true;
+  els.bars.hidden = true;
+  els.osd.hidden = false;
+  els.snow.classList.remove("heavy");
   els.randomButton.disabled = false;
 }
 
-function searchUrl(params) {
-  return (HAS_WORKER_API ? "/api/search" : SEARCH_URL) + "?" + params;
-}
-
-function metadataUrl(identifier) {
-  const encoded = encodeURIComponent(identifier);
-  return HAS_WORKER_API ? "/api/metadata/" + encoded : METADATA_URL + "/" + encoded;
+function setErrorUi(message) {
+  els.loading.hidden = true;
+  els.errorPanel.hidden = false;
+  els.bars.hidden = false;
+  els.osd.hidden = true;
+  els.playPrompt.hidden = true;
+  els.snow.classList.add("heavy");
+  els.errorMessage.textContent = message;
+  els.randomButton.disabled = false;
 }
 
 async function fetchJson(url, label) {
@@ -115,12 +157,7 @@ async function fetchJson(url, label) {
   const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
   try {
-    const response = await fetch(url, {
-      mode: "cors",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-
+    const response = await fetch(url, { mode: "cors", cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(label + ": " + response.status + " " + response.statusText);
     return response.json();
   } catch (error) {
@@ -163,12 +200,7 @@ function isRecentlyPlayed(identifier) {
 
 function rememberIdentifier(identifier) {
   if (!identifier) return;
-
-  const next = [
-    identifier,
-    ...recentIdentifiers().filter((item) => item !== identifier),
-  ].slice(0, RECENT_HISTORY_LIMIT);
-
+  const next = [identifier, ...recentIdentifiers().filter((item) => item !== identifier)].slice(0, RECENT_HISTORY_LIMIT);
   localStorage.setItem(RECENT_HISTORY_KEY, JSON.stringify(next));
 }
 
@@ -205,15 +237,8 @@ function writeDeck(key, deck) {
 function drawFromDeck(key, sourceIdentifiers) {
   const source = [...new Set(sourceIdentifiers)].filter(Boolean);
   let deck = readDeck(key).filter((identifier) => source.includes(identifier) && !isRecentlyPlayed(identifier));
-
-  if (!deck.length) {
-    deck = shuffle(source.filter((identifier) => !isRecentlyPlayed(identifier)));
-  }
-
-  if (!deck.length) {
-    deck = shuffle(source);
-  }
-
+  if (!deck.length) deck = shuffle(source.filter((identifier) => !isRecentlyPlayed(identifier)));
+  if (!deck.length) deck = shuffle(source);
   const identifier = deck.shift();
   writeDeck(key, deck);
   return identifier;
@@ -240,7 +265,6 @@ async function randomIdentifier() {
     const total = await getTotalItems();
     const start = Math.floor(Math.random() * total);
     const page = Math.floor(start / ROWS) + 1;
-
     const params = new URLSearchParams({
       q: "collection:" + COLLECTION + " AND mediatype:movies",
       "fl[]": "identifier",
@@ -248,11 +272,8 @@ async function randomIdentifier() {
       page: String(page),
       output: "json",
     });
-
     const data = await fetchJson(searchUrl(params), "Archive search");
-    const identifiers = (data.response?.docs || [])
-      .map((doc) => doc.identifier)
-      .filter(Boolean);
+    const identifiers = (data.response?.docs || []).map((doc) => doc.identifier).filter(Boolean);
     if (!identifiers.length) throw new Error("Archive.org returned an empty random page.");
     return pickIdentifier(identifiers);
   } catch (error) {
@@ -263,7 +284,6 @@ async function randomIdentifier() {
 
 async function randomPlayableItem() {
   let lastError = null;
-
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       const identifier = await randomIdentifier();
@@ -276,12 +296,11 @@ async function randomPlayableItem() {
       console.warn(error);
     }
   }
-
   throw lastError || new Error("Could not find a browser-playable video after several random picks.");
 }
 
 async function loadRandomVideo() {
-  setLoading("Finding a tape...");
+  setLoading("Tuning - finding a tape");
 
   try {
     const { item, file } = await randomPlayableItem();
@@ -289,38 +308,89 @@ async function loadRandomVideo() {
     const identifier = metadata.identifier || item.item?.identifier || "";
     const title = textFromValue(metadata.title) || identifier || "Untitled VHS item";
     const videoUrl = archiveFileUrl(identifier, file.name);
-    const posterUrl = posterFile(identifier, item.files || []);
 
+    currentTape = { identifier, title };
     els.video.pause();
     els.video.removeAttribute("src");
     els.video.load();
     els.video.src = videoUrl;
-    els.video.poster = posterUrl;
+    els.video.muted = true;
 
-    els.poster.src = posterUrl;
-    els.poster.alt = title ? `${title} thumbnail` : "";
     els.title.textContent = title;
-    els.description.textContent = cleanDescription(metadata.description);
+    els.description.textContent = cleanDescription(metadata.creator || metadata.date || metadata.description);
     els.identifier.textContent = identifier || "-";
     els.runtime.textContent = secondsToRuntime(file.length || metadata.runtime);
     els.sourceFile.textContent = file.name || "-";
-    els.archiveLink.href = identifier ? `https://archive.org/details/${encodeURIComponent(identifier)}` : "https://archive.org/details/vhsvault";
+    els.archiveLink.href = identifier ? "https://archive.org/details/" + encodeURIComponent(identifier) : "https://archive.org/details/vhsvault";
+    els.tapeMode.textContent = Math.random() < 0.5 ? "SP" : "EP";
+    els.channel.textContent = pad(Math.floor(Math.random() * 60) + 2);
+    els.stamp.textContent = randomStamp();
+    els.timecode.textContent = "0:00:00";
+    els.muteButton.textContent = "TAP FOR SOUND";
     rememberIdentifier(identifier);
 
-    clearLoading();
-    await els.video.play().catch(() => {
-      // Browser autoplay rules may require the user to press play.
+    setPlayingUi();
+    flashScreen();
+    await els.video.play().then(() => {
+      els.playPrompt.hidden = true;
+      els.transportIcon.textContent = "PLAY";
+      els.transportState.textContent = "PLAY";
+    }).catch(() => {
+      els.playPrompt.hidden = false;
+      els.transportIcon.textContent = "PAUSE";
+      els.transportState.textContent = "PAUSE";
     });
   } catch (error) {
-    els.title.textContent = "Could not load a random tape";
+    currentTape = null;
+    els.title.textContent = "No signal";
     els.description.textContent = error.message;
     els.identifier.textContent = "-";
     els.runtime.textContent = "-";
     els.sourceFile.textContent = "-";
     els.archiveLink.href = "https://archive.org/details/vhsvault";
-    clearLoading();
+    setErrorUi(error.message);
+  }
+}
+
+function updateTransportUi() {
+  const playing = !els.video.paused && !els.video.ended;
+  els.playPrompt.hidden = playing || els.osd.hidden;
+  els.transportIcon.textContent = playing ? "PLAY" : "PAUSE";
+  els.transportState.textContent = playing ? "PLAY" : "PAUSE";
+}
+
+function togglePlayback() {
+  if (!currentTape) return;
+  if (els.video.paused) {
+    els.video.muted = false;
+    els.muteButton.textContent = "VOL ---|--";
+    els.video.play().catch(() => {});
+  } else {
+    els.video.pause();
   }
 }
 
 els.randomButton.addEventListener("click", loadRandomVideo);
+els.video.addEventListener("click", togglePlayback);
+els.muteButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  els.video.muted = !els.video.muted;
+  els.muteButton.textContent = els.video.muted ? "TAP FOR SOUND" : "VOL ---|--";
+  if (!els.video.muted && els.video.paused) els.video.play().catch(() => {});
+});
+els.video.addEventListener("play", updateTransportUi);
+els.video.addEventListener("pause", updateTransportUi);
+els.video.addEventListener("ended", loadRandomVideo);
+els.video.addEventListener("timeupdate", () => {
+  els.timecode.textContent = secondsToRuntime(els.video.currentTime);
+});
+els.video.addEventListener("loadedmetadata", () => {
+  if (!els.runtime.textContent || els.runtime.textContent === "-") {
+    els.runtime.textContent = secondsToRuntime(els.video.duration);
+  }
+});
+els.video.addEventListener("error", () => {
+  if (currentTape) loadRandomVideo();
+});
+
 loadRandomVideo();
