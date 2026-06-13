@@ -37,7 +37,6 @@ const els = {
   channel: document.querySelector("#channel"),
   stamp: document.querySelector("#stamp"),
   timecode: document.querySelector("#timecode"),
-  muteButton: document.querySelector("#muteButton"),
 };
 
 let totalItems = null;
@@ -314,7 +313,7 @@ async function loadRandomVideo() {
     els.video.removeAttribute("src");
     els.video.load();
     els.video.src = videoUrl;
-    els.video.muted = true;
+    els.video.muted = false;
 
     els.title.textContent = title;
     els.description.textContent = cleanDescription(metadata.creator || metadata.date || metadata.description);
@@ -326,7 +325,6 @@ async function loadRandomVideo() {
     els.channel.textContent = pad(Math.floor(Math.random() * 60) + 2);
     els.stamp.textContent = randomStamp();
     els.timecode.textContent = "0:00:00";
-    els.muteButton.textContent = "TAP FOR SOUND";
     rememberIdentifier(identifier);
 
     setPlayingUi();
@@ -363,7 +361,6 @@ function togglePlayback() {
   if (!currentTape) return;
   if (els.video.paused) {
     els.video.muted = false;
-    els.muteButton.textContent = "VOL ---|--";
     els.video.play().catch(() => {});
   } else {
     els.video.pause();
@@ -372,12 +369,6 @@ function togglePlayback() {
 
 els.randomButton.addEventListener("click", loadRandomVideo);
 els.video.addEventListener("click", togglePlayback);
-els.muteButton.addEventListener("click", (event) => {
-  event.stopPropagation();
-  els.video.muted = !els.video.muted;
-  els.muteButton.textContent = els.video.muted ? "TAP FOR SOUND" : "VOL ---|--";
-  if (!els.video.muted && els.video.paused) els.video.play().catch(() => {});
-});
 els.video.addEventListener("play", updateTransportUi);
 els.video.addEventListener("pause", updateTransportUi);
 els.video.addEventListener("ended", loadRandomVideo);

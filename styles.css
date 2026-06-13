@@ -199,16 +199,6 @@ a {
   color: var(--cyan);
 }
 
-.mute-button {
-  pointer-events: auto;
-  margin-top: 8px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--amber);
-  cursor: pointer;
-  font-size: clamp(15px, 1.9vw, 22px);
-}
 
 .stamp {
   left: 3%;
