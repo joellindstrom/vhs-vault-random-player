@@ -1,6 +1,7 @@
 const COLLECTION = "vhsvault";
 const SEARCH_URL = "https://archive.org/advancedsearch.php";
 const METADATA_URL = "https://archive.org/metadata";
+const HAS_WORKER_API = !["localhost", "127.0.0.1", "::1"].includes(location.hostname) && !location.hostname.endsWith("github.io");
 const ROWS = 250;
 const FALLBACK_CATALOG_URL = "./fallback-identifiers.json";
 const MAX_ATTEMPTS = 8;
@@ -100,6 +101,15 @@ function clearLoading() {
   els.randomButton.disabled = false;
 }
 
+function searchUrl(params) {
+  return (HAS_WORKER_API ? "/api/search" : SEARCH_URL) + "?" + params;
+}
+
+function metadataUrl(identifier) {
+  const encoded = encodeURIComponent(identifier);
+  return HAS_WORKER_API ? "/api/metadata/" + encoded : METADATA_URL + "/" + encoded;
+}
+
 async function fetchJson(url, label) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 15000);
@@ -131,7 +141,7 @@ async function getTotalItems() {
     page: "1",
     output: "json",
   });
-  const data = await fetchJson(SEARCH_URL + "?" + params, "Archive search count");
+  const data = await fetchJson(searchUrl(params), "Archive search count");
   totalItems = data.response?.numFound || 0;
   if (!totalItems) throw new Error("The VHS Vault search did not return any items.");
   return totalItems;
@@ -239,7 +249,7 @@ async function randomIdentifier() {
       output: "json",
     });
 
-    const data = await fetchJson(SEARCH_URL + "?" + params, "Archive search");
+    const data = await fetchJson(searchUrl(params), "Archive search");
     const identifiers = (data.response?.docs || [])
       .map((doc) => doc.identifier)
       .filter(Boolean);
@@ -257,7 +267,7 @@ async function randomPlayableItem() {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       const identifier = await randomIdentifier();
-      const item = await fetchJson(METADATA_URL + "/" + encodeURIComponent(identifier), "Archive metadata");
+      const item = await fetchJson(metadataUrl(identifier), "Archive metadata");
       const file = playableFile(item.files || []);
       if (file) return { item, file };
       lastError = new Error("No playable video file found for " + identifier);
