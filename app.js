@@ -2,15 +2,17 @@ const COLLECTION = "vhsvault";
 const SEARCH_URL = "https://archive.org/advancedsearch.php";
 const METADATA_URL = "https://archive.org/metadata";
 const HAS_WORKER_API = !["localhost", "127.0.0.1", "::1"].includes(location.hostname) && !location.hostname.endsWith("github.io");
+const MIN_RUNTIME_SECONDS = 45 * 60;
+const COLLECTION_QUERY = "collection:" + COLLECTION + " AND mediatype:movies AND runtime:[" + MIN_RUNTIME_SECONDS + " TO *]";
 const ROWS = 250;
 const FALLBACK_CATALOG_URL = "./fallback-identifiers.json";
-const MAX_ATTEMPTS = 8;
+const MAX_ATTEMPTS = 25;
 const RECENT_HISTORY_KEY = "vhsVaultRecentIdentifiers";
 const RECENT_HISTORY_LIMIT = 100;
-const FALLBACK_DECK_KEY = "vhsVaultFallbackDeck";
+const FALLBACK_DECK_KEY = "vhsVaultFallbackDeck45Min";
 const FALLBACK_IDENTIFIERS = [
-  "rare-servicio-de-radiodifusion-publica-logo-1971-1985",
-  "national-security-2003-trailer"
+  "the-man-in-the-iron-mask-1977-historical-adventure",
+  "gods-little-acre-1958-bw-adult-racy-comedy"
 ];
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -108,7 +110,9 @@ function playableFile(files) {
   const candidates = files.filter((file) => {
     const name = file.name || "";
     const format = String((file.format || "") + " " + (file.source || "")).toLowerCase();
-    return /\.(mp4|m4v|webm|ogv)$/i.test(name) || format.includes("mpeg4") || format.includes("h.264") || format.includes("webm");
+    const length = Number(file.length || 0);
+    const playable = /\.(mp4|m4v|webm|ogv)$/i.test(name) || format.includes("mpeg4") || format.includes("h.264") || format.includes("webm");
+    return playable && length >= MIN_RUNTIME_SECONDS;
   });
 
   return candidates.sort((a, b) => {
@@ -171,7 +175,7 @@ async function getTotalItems() {
   if (totalItems !== null) return totalItems;
 
   const params = new URLSearchParams({
-    q: "collection:" + COLLECTION + " AND mediatype:movies",
+    q: COLLECTION_QUERY,
     "fl[]": "identifier",
     rows: "0",
     page: "1",
@@ -265,7 +269,7 @@ async function randomIdentifier() {
     const start = Math.floor(Math.random() * total);
     const page = Math.floor(start / ROWS) + 1;
     const params = new URLSearchParams({
-      q: "collection:" + COLLECTION + " AND mediatype:movies",
+      q: COLLECTION_QUERY,
       "fl[]": "identifier",
       rows: String(ROWS),
       page: String(page),
@@ -289,7 +293,7 @@ async function randomPlayableItem() {
       const item = await fetchJson(metadataUrl(identifier), "Archive metadata");
       const file = playableFile(item.files || []);
       if (file) return { item, file };
-      lastError = new Error("No playable video file found for " + identifier);
+      lastError = new Error("No playable video file at least 45 minutes long found for " + identifier);
     } catch (error) {
       lastError = error;
       console.warn(error);

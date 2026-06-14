@@ -1,5 +1,7 @@
 const ARCHIVE_SEARCH_URL = "https://archive.org/advancedsearch.php";
 const ARCHIVE_METADATA_URL = "https://archive.org/metadata";
+const MIN_RUNTIME_SECONDS = 45 * 60;
+const DEFAULT_QUERY = "collection:vhsvault AND mediatype:movies AND runtime:[" + MIN_RUNTIME_SECONDS + " TO *]";
 
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
@@ -36,7 +38,7 @@ async function archiveJson(url, label) {
 async function search(requestUrl) {
   const params = new URLSearchParams(requestUrl.search);
   const archiveParams = new URLSearchParams({
-    q: params.get("q") || "collection:vhsvault AND mediatype:movies",
+    q: params.get("q") || DEFAULT_QUERY,
     rows: params.get("rows") || "250",
     page: params.get("page") || "1",
     output: "json",
