@@ -3,16 +3,17 @@ const SEARCH_URL = "https://archive.org/advancedsearch.php";
 const METADATA_URL = "https://archive.org/metadata";
 const HAS_WORKER_API = !["localhost", "127.0.0.1", "::1"].includes(location.hostname) && !location.hostname.endsWith("github.io");
 const MIN_RUNTIME_SECONDS = 45 * 60;
-const COLLECTION_QUERY = "collection:" + COLLECTION + " AND mediatype:movies AND runtime:[" + MIN_RUNTIME_SECONDS + " TO *]";
+const MAX_CONTENT_YEAR = 1999;
+const COLLECTION_QUERY = "collection:" + COLLECTION + " AND mediatype:movies AND runtime:[" + MIN_RUNTIME_SECONDS + " TO *] AND date:[0000-01-01 TO " + MAX_CONTENT_YEAR + "-12-31]";
 const ROWS = 250;
 const FALLBACK_CATALOG_URL = "./fallback-identifiers.json";
 const MAX_ATTEMPTS = 25;
 const RECENT_HISTORY_KEY = "vhsVaultRecentIdentifiers";
 const RECENT_HISTORY_LIMIT = 100;
-const FALLBACK_DECK_KEY = "vhsVaultFallbackDeck45Min";
+const FALLBACK_DECK_KEY = "vhsVaultFallbackDeck45MinPre2000";
 const FALLBACK_IDENTIFIERS = [
   "the-man-in-the-iron-mask-1977-historical-adventure",
-  "gods-little-acre-1958-bw-adult-racy-comedy"
+  "francis-joins-the-wacs-1954-classic-comedy-talking-mule"
 ];
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -106,6 +107,30 @@ function flashScreen() {
   els.flash.classList.remove("on");
   void els.flash.offsetWidth;
   els.flash.classList.add("on");
+}
+
+function fieldValues(value) {
+  if (Array.isArray(value)) return value.flatMap(fieldValues);
+  if (value === null || value === undefined) return [];
+  return [String(value)];
+}
+
+function yearsFromValue(value) {
+  return fieldValues(value)
+    .join(" ")
+    .match(/\b(?:18|19|20)\d{2}\b/g)
+    ?.map(Number) || [];
+}
+
+function pre2000ContentYear(metadata = {}) {
+  const years = [
+    ...yearsFromValue(metadata.date),
+    ...yearsFromValue(metadata.year),
+  ];
+
+  if (!years.length) return null;
+  if (years.some((year) => year > MAX_CONTENT_YEAR)) return null;
+  return Math.max(...years.filter((year) => year <= MAX_CONTENT_YEAR));
 }
 
 function playableFile(files) {
@@ -293,8 +318,15 @@ async function randomPlayableItem() {
     try {
       const identifier = await randomIdentifier();
       const item = await fetchJson(metadataUrl(identifier), "Archive metadata");
+      const metadata = item.metadata || {};
+      const contentYear = pre2000ContentYear(metadata);
+      if (!contentYear) {
+        lastError = new Error("No pre-2000 content date found for " + identifier);
+        continue;
+      }
+
       const file = playableFile(item.files || []);
-      if (file) return { item, file };
+      if (file) return { item, file, contentYear };
       lastError = new Error("No playable video file at least 45 minutes long found for " + identifier);
     } catch (error) {
       lastError = error;
@@ -308,7 +340,7 @@ async function loadRandomVideo() {
   setLoading("Tuning - finding a tape");
 
   try {
-    const { item, file } = await randomPlayableItem();
+    const { item, file, contentYear } = await randomPlayableItem();
     const metadata = item.metadata || {};
     const identifier = metadata.identifier || item.item?.identifier || "";
     const title = textFromValue(metadata.title) || identifier || "Untitled VHS item";
@@ -322,7 +354,7 @@ async function loadRandomVideo() {
     els.video.muted = false;
 
     els.title.textContent = title;
-    els.description.textContent = cleanDescription(metadata.creator || metadata.date || metadata.description);
+    els.description.textContent = cleanDescription(metadata.creator || metadata.date || metadata.description) + (contentYear ? " - " + contentYear : "");
     els.identifier.textContent = identifier || "-";
     els.runtime.textContent = secondsToRuntime(file.length || metadata.runtime);
     els.sourceFile.textContent = file.name || "-";

@@ -1,7 +1,8 @@
 const ARCHIVE_SEARCH_URL = "https://archive.org/advancedsearch.php";
 const ARCHIVE_METADATA_URL = "https://archive.org/metadata";
 const MIN_RUNTIME_SECONDS = 45 * 60;
-const DEFAULT_QUERY = "collection:vhsvault AND mediatype:movies AND runtime:[" + MIN_RUNTIME_SECONDS + " TO *]";
+const MAX_CONTENT_YEAR = 1999;
+const DEFAULT_QUERY = "collection:vhsvault AND mediatype:movies AND runtime:[" + MIN_RUNTIME_SECONDS + " TO *] AND date:[0000-01-01 TO " + MAX_CONTENT_YEAR + "-12-31]";
 
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
