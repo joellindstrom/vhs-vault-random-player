@@ -368,6 +368,7 @@ a {
 .ghost {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 13px 18px;
   border: 2px solid rgba(255,255,255,.25);
@@ -376,6 +377,42 @@ a {
   font-size: 24px;
   white-space: nowrap;
   transition: background .15s;
+}
+
+button.ghost {
+  cursor: pointer;
+}
+
+.screen-shell:fullscreen,
+.screen-shell.is-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.screen-shell:fullscreen .video,
+.screen-shell.is-fullscreen .video {
+  object-fit: contain;
+}
+
+.screen-shell:fullscreen .title-band,
+.screen-shell.is-fullscreen .title-band {
+  bottom: clamp(18px, 5vh, 54px);
+}
+
+.screen-shell:fullscreen .osd-top-left,
+.screen-shell.is-fullscreen .osd-top-left,
+.screen-shell:fullscreen .osd-top-right,
+.screen-shell.is-fullscreen .osd-top-right {
+  top: clamp(18px, 4vh, 42px);
+}
+
+.screen-shell:fullscreen .stamp,
+.screen-shell.is-fullscreen .stamp {
+  top: clamp(80px, 14vh, 150px);
 }
 
 .ghost:hover {

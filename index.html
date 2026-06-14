@@ -11,7 +11,7 @@
   </head>
   <body>
     <main class="stage">
-      <section class="screen-shell" aria-label="VHS Vault random tape player">
+      <section id="screenShell" class="screen-shell" aria-label="VHS Vault random tape player">
         <video id="video" class="video" playsinline preload="metadata"></video>
 
         <div id="bars" class="bars" aria-hidden="true">
@@ -72,6 +72,7 @@
             <span>ANOTHER RANDOM TAPE</span>
             <span class="select blink">SELECT</span>
           </button>
+          <button id="fullscreenButton" class="ghost osd-text" type="button" aria-pressed="false">FULL SCREEN</button>
           <a id="archiveLink" class="ghost osd-text" href="https://archive.org/details/vhsvault" target="_blank" rel="noreferrer">OPEN ITEM</a>
         </div>
         <dl class="meta osd-text">
@@ -81,6 +82,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=full-program-45m-1"></script>
+    <script src="./app.js?v=fullscreen-1"></script>
   </body>
 </html>

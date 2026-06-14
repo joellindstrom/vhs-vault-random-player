@@ -17,6 +17,7 @@ const FALLBACK_IDENTIFIERS = [
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 const els = {
+  screenShell: document.querySelector("#screenShell"),
   video: document.querySelector("#video"),
   title: document.querySelector("#title"),
   description: document.querySelector("#description"),
@@ -25,6 +26,7 @@ const els = {
   sourceFile: document.querySelector("#sourceFile"),
   archiveLink: document.querySelector("#archiveLink"),
   randomButton: document.querySelector("#randomButton"),
+  fullscreenButton: document.querySelector("#fullscreenButton"),
   loading: document.querySelector("#loading"),
   bars: document.querySelector("#bars"),
   osd: document.querySelector("#osd"),
@@ -361,6 +363,31 @@ function updateTransportUi() {
   els.transportState.textContent = playing ? "PLAY" : "PAUSE";
 }
 
+function isFullscreen() {
+  return document.fullscreenElement === els.screenShell;
+}
+
+function updateFullscreenUi() {
+  const active = isFullscreen();
+  els.fullscreenButton.textContent = active ? "EXIT FULL SCREEN" : "FULL SCREEN";
+  els.fullscreenButton.setAttribute("aria-pressed", String(active));
+  els.screenShell.classList.toggle("is-fullscreen", active);
+}
+
+async function toggleFullscreen() {
+  try {
+    if (isFullscreen()) {
+      await document.exitFullscreen();
+    } else {
+      await els.screenShell.requestFullscreen();
+    }
+  } catch (error) {
+    console.warn(error);
+  } finally {
+    updateFullscreenUi();
+  }
+}
+
 function togglePlayback() {
   if (!currentTape) return;
   if (els.video.paused) {
@@ -372,6 +399,8 @@ function togglePlayback() {
 }
 
 els.randomButton.addEventListener("click", loadRandomVideo);
+els.fullscreenButton.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", updateFullscreenUi);
 els.video.addEventListener("click", togglePlayback);
 els.video.addEventListener("play", updateTransportUi);
 els.video.addEventListener("pause", updateTransportUi);
